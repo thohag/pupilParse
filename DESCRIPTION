@@ -1,0 +1,16 @@
+Package: pupilParse
+Type: Package
+Title: pupilParse
+Version: 0.1
+Date: 2016-05-17
+Author: thohag
+Maintainer: Who to complain to <yourfault@somewhere.net>
+Description: Collection of helper functions for pupillometry
+License: MIT
+LazyData: TRUE
+RoxygenNote: 5.0.1
+Suggests: knitr,
+    rmarkdown
+VignetteBuilder: knitr
+depends: data.table
+imports: stats,zoo,pracma,data.table

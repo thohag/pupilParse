@@ -1,0 +1,157 @@
+---
+title: "Pupil Processing Example With pupilParse"
+author: "thohag"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    fig_caption: yes
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+This is a short tutorial which aims to demonstrate an example use case of the pupilParse package.
+
+
+
+## Processing steps {.tabset}
+
+Example of a processing procedure for pupillometry data.
+Different data sets might need a different ordering of the steps and/or different methods.
+
+### Load library and data
+
+Make sure you have installed the library
+
+```{r eval=FALSE}
+install.packages("devtools")
+library(devtools)
+install_github("thohag/pupilParse")
+```
+
+Then load the library and the example data
+
+```{r}
+library(pupilParse)
+data(pupilsamples)
+```
+```{r, echo=FALSE, results='asis'}
+knitr::kable(head(pupilsamples, 10))
+```
+
+This example dataset contains some raw data with left and right pupil sizes in the "L.Mapped.Diameter..mm." and "R.Mapped.Diameter..mm." columns.
+To use this with the pupilParse package we need to convert it into a common format by running `pupilPrepare`:
+
+### Prepare the data
+
+```{r}
+pupilsamples = pupilPrepare(pupilsamples,
+                            subjectsColumn = "Subject",
+                            trialsColumn = "Trial",
+                            pupilSizeLeftColumn = "L.Mapped.Diameter..mm.",
+                            pupilSizeRightColumn = "R.Mapped.Diameter..mm.",
+                            samplingFrequency = 60)
+```
+
+```{r, echo=FALSE, results='asis'}
+knitr::kable(head(pupilsamples, 10))
+```
+
+This function renamed the columns for us into the standard format as well as calculating a 'TrialTime' column based on the supplied samplingFrequency. This column in important for averaging across trials as we may be interested in the pupil size at similar time points within a trial.
+
+
+### Inspect raw data
+
+Next, let us plot the raw data to get an overview:
+
+```{r, fig.width=7, fig.height=4, fig.cap = "Raw data"}
+avgs = pupilsamples[,list(Left=mean(PupilSizeL,na.rm=T), Right=mean(PupilSizeR,na.rm=T)),by=TrialTime]
+ylim = range(avgs$Left,avgs$Right)
+plot(Left~TrialTime, data=avgs, ylim=ylim, type="l", col="green", ylab="Pupil size")
+lines(Right~TrialTime, data=avgs, ylim=ylim, type="l", col="red")
+legend("topleft", legend = c("Left","Right"), fill=c("green","red"))
+```
+
+
+### Clean the data
+
+The data set is obiously noisy, se we will try to clean it up a bit by using the `pupilCleaner` function
+
+```{r, fig.width=7, fig.height=4, fig.cap = "Cleaned data"}
+pupilCleaner(pupilsamples)
+avgs = pupilsamples[,list(Left=mean(PupilSizeL,na.rm=T), Right=mean(PupilSizeR,na.rm=T)),by=TrialTime]
+ylim = range(avgs$Left,avgs$Right)
+plot(Left~TrialTime, data=avgs, ylim=ylim, type="l", col="green", ylab="Pupil size")
+lines(Right~TrialTime, data=avgs, ylim=ylim, type="l", col="red")
+legend("topleft", legend = c("Left","Right"), fill=c("green","red"))
+```
+
+Both eyes seems to follow a similar pattern, which is good. Also, they seem to be offset by some constant, this is not a problem, we will later correct for this by using the `pupilNormalizer` function.
+
+
+### Inspect blink distributions
+
+Next we will inspect the distribution of blinks in our sample, if blinks tends to be clustered around certain time points we should try to remove and iterpolate pupil data for blinks periods to reduce blink related pupil changes. Also this might help to reduce noise further (if you do not have blink data, then skip this step).
+
+```{r, fig.width=7, fig.height=4, fig.cap = "Distribution of blinks over time"}
+avgs = pupilsamples[,list(Left=mean(BlinkL,na.rm=T), Right=mean(BlinkR,na.rm=T)),by=TrialTime]
+ylim = range(avgs$Left,avgs$Right)
+plot(Left~TrialTime, data=avgs, ylim=ylim, type="l", col="green", ylab="Blink Rate")
+lines(Right~TrialTime, data=avgs, ylim=ylim, type="l", col="red")
+legend("topleft", legend = c("Left","Right"), fill=c("green","red"))
+```
+
+It appears that we got high concentrations of blinks around 1800 ms and 4700 ms.
+We will thus attempt to clean these periods by removing periods where the eyes were closed and subsequently interpolate over those periods with the `pupilBlinkInterpolator` function.
+
+
+### Interpolate blinks
+
+```{r, fig.width=7, fig.height=4,message=FALSE, fig.cap = "After blink interpolation"}
+pupilBlinkInterpolator(pupilsamples)
+avgs = pupilsamples[,list(Left=mean(PupilSizeL,na.rm=T), Right=mean(PupilSizeR,na.rm=T)),by=TrialTime]
+ylim = range(avgs$Left,avgs$Right)
+plot(Left~TrialTime, data=avgs, ylim=ylim, type="l", col="green", ylab="Pupil size")
+lines(Right~TrialTime, data=avgs, ylim=ylim, type="l", col="red")
+legend("topleft", legend = c("Left","Right"), fill=c("green","red"))
+```
+
+### Smooth the data
+
+As pupil changes related to cognitive processes should not be related to short spikes with large amplitued,
+we will smooth the data to get rid of high frequency pupil changes (or noise).
+
+```{r, fig.width=7, fig.height=4,message=FALSE, fig.cap = "After applying some smoothing"}
+pupilSmoother(pupilsamples, Lowess_f=0.05, Lowess_iter=3L, Lowess_delta=0.05)
+avgs = pupilsamples[,list(Left=mean(PupilSizeL,na.rm=T), Right=mean(PupilSizeR,na.rm=T)),by=TrialTime]
+ylim = range(avgs$Left,avgs$Right)
+plot(Left~TrialTime, data=avgs, ylim=ylim, type="l", col="green", ylab="Pupil size")
+lines(Right~TrialTime, data=avgs, ylim=ylim, type="l", col="red")
+legend("topleft", legend = c("Left","Right"), fill=c("green","red"))
+```
+
+This uses the lowess function from the package stats, see ?stats::lowess for further information on the arguments.
+
+
+### Normalize data
+
+Next we will normalize the pupil data by using a baseline from the first 1000 ms of each trial.
+
+```{r, fig.width=7, fig.height=4,message=FALSE, fig.cap = "Normalized data"}
+pupilNormalizer(pupilsamples, c(0, 1000))
+avgs = pupilsamples[,list(Left=mean(PupilSizeL,na.rm=T), Right=mean(PupilSizeR,na.rm=T)),by=TrialTime]
+ylim = range(avgs$Left,avgs$Right)
+plot(Left~TrialTime, data=avgs, ylim=ylim, type="l", col="green", ylab="% Change from baseline")
+lines(Right~TrialTime, data=avgs, ylim=ylim, type="l", col="red")
+legend("topleft", legend = c("Left","Right"), fill=c("green","red"))
+```
+
+### Combine data
+
+```{r, fig.width=7, fig.height=4,message=FALSE, fig.cap = "Left and right eye combined"}
+avgs = pupilsamples[,list(Size=mean(((PupilSizeL+PupilSizeR)/2),na.rm=T)),by=TrialTime]
+plot(Size~TrialTime, data=avgs, type="l", col="black", ylab="% Change from baseline")
+```
+
