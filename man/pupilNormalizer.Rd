@@ -16,7 +16,7 @@ processes the data.table in place
 }
 \description{
 normalizes pupilsizes according to a specified baseline
-((pupilsize - baselinesize)/baselinesize)*100
+(pupilsize - baselinesize)
 }
 \examples{
 pupilNormalizer(data, c(100,1000))

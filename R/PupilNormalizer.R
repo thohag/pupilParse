@@ -1,7 +1,7 @@
 #' pupilNormalizer
 #'
 #' normalizes pupilsizes according to a specified baseline
-#' ((pupilsize - baselinesize)/baselinesize)*100
+#' (pupilsize - baselinesize)
 #'
 #' @param data a data.table
 #' @param baseline a TrialTime range to use for baseline
@@ -44,7 +44,7 @@ computeBaselines = function(datas, pupilcolumn, tag, range) {
   }
 
   datas[,eval(baselinecolumn):=mean(get(eval(baselinecolumn)),na.rm=T),by = Trial]
-  datas[,eval(pupilcolumn):=((get(eval(pupilcolumn)) - get(eval(baselinecolumn)))/(get(eval(baselinecolumn))))*100,]
+  datas[,eval(pupilcolumn):=((get(eval(pupilcolumn)) - get(eval(baselinecolumn)))),]
 
   #Clean up
   datas[,eval(baselinecolumn):=NULL]
