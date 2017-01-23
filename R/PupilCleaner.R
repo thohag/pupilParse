@@ -17,16 +17,16 @@
 #' pupilCleaner(pupilsamples)
 #'
 #' @export
-pupilCleaner = function(data, MinimumPupilSize=2, MaximumPupilSize=8, SDLimit=3) {
+pupilCleaner = function(data, MinimumPupilSize=2, MaximumPupilSize=8, SDLimit=3, MissingLimit=0.50) {
   if (sum(names(data) == "PupilSizeL") == 1) {
-    cleanPupils(data, "PupilSizeL", MinimumPupilSize, MaximumPupilSize, SDLimit)
+    cleanPupils(data, "PupilSizeL", MinimumPupilSize, MaximumPupilSize, SDLimit, MissingLimit)
   }
   if (sum(names(data) == "PupilSizeR") == 1) {
-    cleanPupils(data, "PupilSizeR", MinimumPupilSize, MaximumPupilSize, SDLimit)
+    cleanPupils(data, "PupilSizeR", MinimumPupilSize, MaximumPupilSize, SDLimit, MissingLimit)
   }
 }
 
-cleanPupils = function(datas, pupilcolumn, MinimumPupilSize, MaximumPupilSize, SDLimit){
+cleanPupils = function(datas, pupilcolumn, MinimumPupilSize, MaximumPupilSize, SDLimit, MissingLimit){
 
   #Set all values outsize physiological limits to NA
 #   sum(is.na(datas$PupilSizeL))
@@ -57,19 +57,29 @@ cleanPupils = function(datas, pupilcolumn, MinimumPupilSize, MaximumPupilSize, S
   datas[is.na(NABack) | is.na(NAFront),eval(pupilcolumn):=NA,]
   datas[,NABack:=NULL]
   datas[,NAFront:=NULL]
+  
+  setkeyv(datas, c("Subject","Trial","TrialTime"))
 
-
-
+  #Calcilate missing
+  missing = datas[is.na(get(eval(pupilcolumn))),list(Missing=.N),by=list(Subject,Trial)]
+  total = datas[,list(Total=.N),by=list(Subject,Trial)]
+  missing = merge(missing, total, by=c("Subject","Trial"))
+  missing = missing[,list(Perc=Missing/Total),by=list(Subject,Trial)]
+  missing = missing[Perc > MissingLimit]
+  datas[,Missing:=FALSE]
+  datas[J(missing$Subject, missing$Trial), Missing:=TRUE]
+  
   #Perform interpolation
   
   #Fill in trials missing anchors
   datas[TrialTime == 0 & is.na(get(eval(pupilcolumn))), eval(pupilcolumn):=Mean]
   nofirst = datas[datas[,list(row1 = .I[1]), by=list(Subject,Trial)][,row1],][is.na(get(eval(pupilcolumn))),list(Subject,Trial,TrialTime)]
   nolast = datas[datas[,list(row1 = .I[.N]), by=list(Subject,Trial)][,row1],][is.na(get(eval(pupilcolumn))),list(Subject,Trial,TrialTime)]
-  setkeyv(datas, c("Subject","Trial","TrialTime"))
+  
   datas[J(nofirst), eval(pupilcolumn):=Mean]
   datas[J(nolast), eval(pupilcolumn):=Mean]
   
+  #Interpolate
   datas[!is.na(Mean),eval(pupilcolumn):=na.approx(get(eval(pupilcolumn)),na.rm=F),by=list(Subject,Trial)]
 
 
