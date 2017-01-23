@@ -45,6 +45,10 @@ cleanPupils = function(datas, pupilcolumn, MinimumPupilSize, MaximumPupilSize, S
   datas[get(eval(pupilcolumn)) < LowerLimit, eval(pupilcolumn):=NA]
 
   datas[,Mean:=mean(get(eval(pupilcolumn)),na.rm=T),by=list(Subject,Trial)]
+  
+  #If Mean is not calculated, use grand average
+  datas[,GrandMean:=mean(Mean,na.rm=T)]
+  datas[is.nan(Mean),Mean:=GrandMean]
 
 
   #Fill inn NAs around NAs
@@ -57,7 +61,15 @@ cleanPupils = function(datas, pupilcolumn, MinimumPupilSize, MaximumPupilSize, S
 
 
   #Perform interpolation
+  
+  #Fill in trials missing anchors
   datas[TrialTime == 0 & is.na(get(eval(pupilcolumn))), eval(pupilcolumn):=Mean]
+  nofirst = datas[datas[,list(row1 = .I[1]), by=list(Subject,Trial)][,row1],][is.na(get(eval(pupilcolumn))),list(Subject,Trial,TrialTime)]
+  nolast = datas[datas[,list(row1 = .I[.N]), by=list(Subject,Trial)][,row1],][is.na(get(eval(pupilcolumn))),list(Subject,Trial,TrialTime)]
+  setkeyv(datas, c("Subject","Trial","TrialTime"))
+  datas[J(nofirst), eval(pupilcolumn):=Mean]
+  datas[J(nolast), eval(pupilcolumn):=Mean]
+  
   datas[!is.na(Mean),eval(pupilcolumn):=na.approx(get(eval(pupilcolumn)),na.rm=F),by=list(Subject,Trial)]
 
 
